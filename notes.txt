@@ -1,0 +1,104 @@
+What is LangChain?
+
+LangChain is a framework that helps developers build applications powered by Large Language Models (LLMs).
+
+It provides components like:
+
+LLMs – GPT, Claude, etc.
+
+Chains – sequence of operations
+
+Tools – external capabilities (search, calculator, database)
+
+Agents – LLMs that decide which tools to use
+
+Memory – conversation context
+
+Agent Concept
+
+An Agent is an LLM that can:
+
+Understand a user query
+
+Decide what tool to use
+
+Execute the tool
+
+Return the result
+
+Example:
+
+User:
+
+What is the square root of 625?
+
+Agent reasoning:
+
+Needs calculation
+
+Uses calculator tool
+
+Returns result
+
+---------------------
+What Are Tools in LangChain?
+
+Tools are functions that agents can call.
+
+Examples:
+
+calculator
+
+web search
+
+database query
+
+API call
+
+Creating a Simple Tool
+--------------------------
+from langchain.tools import tool
+
+@tool
+def multiply_numbers(a: int, b: int) -> int:
+    """Multiply two numbers"""
+    return a * b
+
+Explanation:
+
+@tool converts Python function into agent tool
+docstring describes when to use it
+
+------------------------------
+FAISS stands for Facebook AI Similarity Search. It is an open-source library developed by Meta's Facebook AI Research team 
+designed for efficient similarity search and clustering of dense vectors, capable of handling large-scale, high-dimensional data on both CPU and GPU. 
+
+Key Aspects of FAISS:
+Purpose: It searches for vectors that are similar to a query vector, crucial for recommendation systems, search engines, and image/text retrieval.
+Scale: It can handle datasets containing millions or billions of vectors.
+Performance: It provides high-speed similarity search, often utilizing approximate nearest neighbor (ANN) algorithms, and supports GPU acceleration.
+Not a Database: FAISS is a library for searching vectors, not a full-fledged database with native storage, metadata, or data management
+
+-------------------
+hub.pull("hwchase17/react") downloads a pre-built ReAct prompt template from LangChain Hub — a public registry of reusable prompts hosted at smith.langchain.com/hub.
+Breaking it down:
+
+hwchase17 — the GitHub username of Harrison Chase, co-founder of LangChain. He published this prompt.
+react — the prompt implements the ReAct (Reasoning + Acting) pattern.
+
+What the prompt actually contains:
+It gives the LLM a strict format to follow on every step:
+Thought:   I need to figure out what 6 × 7 is
+Action:    multiply_numbers
+Action Input: 6, 7
+Observation: 42
+Thought:   I now know the final answer
+Final Answer: 42
+The LLM is instructed to loop through Thought → Action → Observation until it has enough information to give a Final Answer. LangChain's AgentExecutor parses each step, calls the appropriate tool when it sees an Action, feeds the result back as Observation, and keeps looping.
+Why pull it instead of writing it yourself?
+You could write this prompt manually, but hub.pull saves you from:
+
+Getting the exact format tokens wrong (LangChain's parser is strict about keywords like Action Input:)
+Managing the {tools}, {tool_names}, {agent_scratchpad} placeholders yourself — the template handles all of these automatically
+
+In short: it's the instruction manual that teaches the LLM how to be an agent — without it, the LLM would just respond like a chatbot with no awareness of the tools available to it.

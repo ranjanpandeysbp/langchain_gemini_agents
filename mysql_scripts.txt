@@ -1,0 +1,280 @@
+-- ============================================================
+--  MySQL DDL + DML Script
+--  Tables: products, orders, order_items, sales
+--  Run this script against your target database:
+--    mysql -u root -p your_database < mysql_ddl_dml.sql
+-- ============================================================
+
+
+-- ────────────────────────────────────────────────────────────
+--  SAFETY: drop tables in reverse dependency order so foreign
+--  key constraints do not block the DROP statements
+-- ────────────────────────────────────────────────────────────
+DROP TABLE IF EXISTS sales;         -- remove sales first (references order_items)
+DROP TABLE IF EXISTS order_items;   -- remove order_items next (references orders + products)
+DROP TABLE IF EXISTS orders;        -- remove orders next (references customers)
+DROP TABLE IF EXISTS customers;     -- remove customers next (referenced by orders)
+DROP TABLE IF EXISTS products;      -- remove products last (referenced by order_items)
+
+
+-- ============================================================
+--  DDL — CREATE TABLES
+-- ============================================================
+
+
+-- ────────────────────────────────────────────────────────────
+--  TABLE: products
+--  Stores the product catalogue with pricing and stock info
+-- ────────────────────────────────────────────────────────────
+CREATE TABLE products (
+    product_id      INT           AUTO_INCREMENT PRIMARY KEY,  -- unique identifier, auto-incremented by MySQL
+    product_name    VARCHAR(150)  NOT NULL,                    -- human-readable product name, required
+    category        VARCHAR(100)  NOT NULL,                    -- product category (e.g. Electronics, Clothing)
+    unit_price      DECIMAL(10,2) NOT NULL,                    -- selling price per unit, two decimal places
+    cost_price      DECIMAL(10,2) NOT NULL,                    -- purchase / manufacturing cost per unit
+    stock_quantity  INT           NOT NULL DEFAULT 0,          -- current units available in warehouse
+    created_at      DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP  -- row creation timestamp
+);
+
+
+-- ────────────────────────────────────────────────────────────
+--  TABLE: customers
+--  Stores customer master data referenced by orders
+-- ────────────────────────────────────────────────────────────
+CREATE TABLE customers (
+    customer_id    INT          AUTO_INCREMENT PRIMARY KEY,  -- unique customer identifier
+    first_name     VARCHAR(80)  NOT NULL,                    -- customer's first name
+    last_name      VARCHAR(80)  NOT NULL,                    -- customer's last name
+    email          VARCHAR(150) NOT NULL UNIQUE,             -- email address – must be unique across all customers
+    phone          VARCHAR(20),                              -- optional contact phone number
+    city           VARCHAR(100),                             -- customer's city for regional reporting
+    created_at     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP  -- when the customer record was created
+);
+
+
+-- ────────────────────────────────────────────────────────────
+--  TABLE: orders
+--  One row per customer order; totals are stored for quick
+--  reporting without re-aggregating order_items every time
+-- ────────────────────────────────────────────────────────────
+CREATE TABLE orders (
+    order_id        INT           AUTO_INCREMENT PRIMARY KEY,  -- unique order identifier
+    customer_id     INT           NOT NULL,                    -- FK → customers.customer_id
+    order_date      DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,  -- when the order was placed
+    status          VARCHAR(30)   NOT NULL DEFAULT 'pending',  -- order lifecycle: pending | confirmed | shipped | delivered | cancelled
+    total_amount    DECIMAL(10,2) NOT NULL DEFAULT 0.00,       -- pre-computed order total (sum of order_items)
+    shipping_city   VARCHAR(100),                              -- destination city for this order
+    CONSTRAINT fk_orders_customer
+        FOREIGN KEY (customer_id) REFERENCES customers(customer_id)  -- enforce referential integrity
+);
+
+
+-- ────────────────────────────────────────────────────────────
+--  TABLE: order_items
+--  Line items that belong to an order; each row is one
+--  product purchased within an order
+-- ────────────────────────────────────────────────────────────
+CREATE TABLE order_items (
+    item_id       INT           AUTO_INCREMENT PRIMARY KEY,  -- unique line-item identifier
+    order_id      INT           NOT NULL,                    -- FK → orders.order_id
+    product_id    INT           NOT NULL,                    -- FK → products.product_id
+    quantity      INT           NOT NULL,                    -- number of units purchased
+    unit_price    DECIMAL(10,2) NOT NULL,                    -- price per unit at time of purchase (snapshot)
+    line_total    DECIMAL(10,2) NOT NULL,                    -- quantity × unit_price, stored for fast reporting
+    CONSTRAINT fk_items_order
+        FOREIGN KEY (order_id)   REFERENCES orders(order_id),    -- each item must belong to a valid order
+    CONSTRAINT fk_items_product
+        FOREIGN KEY (product_id) REFERENCES products(product_id) -- each item must reference a valid product
+);
+
+
+-- ────────────────────────────────────────────────────────────
+--  TABLE: sales
+--  Aggregated daily sales summary per product; populated from
+--  order_items for fast dashboard and analytics queries
+-- ────────────────────────────────────────────────────────────
+CREATE TABLE sales (
+    sale_id          INT           AUTO_INCREMENT PRIMARY KEY,  -- unique sale-summary identifier
+    order_item_id    INT           NOT NULL,                    -- FK → order_items.item_id (source line item)
+    product_id       INT           NOT NULL,                    -- FK → products.product_id (denormalised for speed)
+    sale_date        DATE          NOT NULL,                    -- calendar date of the sale (extracted from order date)
+    quantity_sold    INT           NOT NULL,                    -- units sold in this transaction
+    revenue          DECIMAL(10,2) NOT NULL,                    -- total income  = quantity × unit_price
+    cost             DECIMAL(10,2) NOT NULL,                    -- total cost    = quantity × cost_price
+    profit           DECIMAL(10,2) NOT NULL,                    -- gross profit  = revenue − cost
+    CONSTRAINT fk_sales_item
+        FOREIGN KEY (order_item_id) REFERENCES order_items(item_id),  -- link back to the originating line item
+    CONSTRAINT fk_sales_product
+        FOREIGN KEY (product_id)    REFERENCES products(product_id)   -- link to the product for easy joins
+);
+
+
+-- ============================================================
+--  DML — INSERT SAMPLE DATA
+-- ============================================================
+
+
+-- ────────────────────────────────────────────────────────────
+--  PRODUCTS  (15 rows across 3 categories)
+-- ────────────────────────────────────────────────────────────
+INSERT INTO products (product_name, category, unit_price, cost_price, stock_quantity) VALUES
+('Laptop Pro 15',        'Electronics',  1299.99,  850.00, 50),   -- high-end laptop
+('Wireless Mouse',       'Electronics',    29.99,   10.00, 200),  -- budget peripheral
+('USB-C Hub 7-in-1',     'Electronics',    49.99,   18.00, 150),  -- popular accessory
+('Mechanical Keyboard',  'Electronics',    89.99,   40.00, 120),  -- gaming/office keyboard
+('4K Monitor 27"',       'Electronics',   399.99,  220.00,  40),  -- large display
+('Running Shoes',        'Clothing',       79.99,   30.00, 300),  -- athletic footwear
+('Denim Jacket',         'Clothing',       59.99,   22.00, 180),  -- casual outerwear
+('Yoga Pants',           'Clothing',       39.99,   14.00, 250),  -- activewear
+('Cotton T-Shirt',       'Clothing',       19.99,    6.00, 500),  -- everyday basic
+('Winter Coat',          'Clothing',      129.99,   55.00,  80),  -- seasonal outerwear
+('Python Programming',   'Books',          34.99,   10.00, 400),  -- programming textbook
+('Data Science Handbook','Books',          44.99,   14.00, 300),  -- analytics reference
+('Machine Learning A-Z', 'Books',          39.99,   12.00, 350),  -- ML course companion
+('Clean Code',           'Books',          29.99,    9.00, 280),  -- software craftsmanship
+('System Design Guide',  'Books',          49.99,   16.00, 220);  -- architecture reference
+
+
+-- ────────────────────────────────────────────────────────────
+--  CUSTOMERS  (10 rows)
+-- ────────────────────────────────────────────────────────────
+INSERT INTO customers (first_name, last_name, email, phone, city) VALUES
+('Ranjan',  'Kumar',    'ranjan.kumar@email.com',   '9876543210', 'Bhubaneswar'),
+('Priya',   'Sharma',   'priya.sharma@email.com',   '9876543211', 'Mumbai'),
+('Amit',    'Singh',    'amit.singh@email.com',     '9876543212', 'Delhi'),
+('Sneha',   'Patel',    'sneha.patel@email.com',    '9876543213', 'Ahmedabad'),
+('Rahul',   'Verma',    'rahul.verma@email.com',    '9876543214', 'Bangalore'),
+('Anjali',  'Nair',     'anjali.nair@email.com',    '9876543215', 'Chennai'),
+('Vikram',  'Mehta',    'vikram.mehta@email.com',   '9876543216', 'Pune'),
+('Deepika', 'Rao',      'deepika.rao@email.com',    '9876543217', 'Hyderabad'),
+('Suresh',  'Joshi',    'suresh.joshi@email.com',   '9876543218', 'Kolkata'),
+('Kavita',  'Gupta',    'kavita.gupta@email.com',   '9876543219', 'Jaipur');
+
+
+-- ────────────────────────────────────────────────────────────
+--  ORDERS  (12 rows with varied statuses and dates)
+-- ────────────────────────────────────────────────────────────
+INSERT INTO orders (customer_id, order_date, status, total_amount, shipping_city) VALUES
+(1,  '2024-01-05 10:30:00', 'delivered',  1329.98, 'Bhubaneswar'),  -- laptop + mouse
+(2,  '2024-01-12 14:15:00', 'delivered',   449.97, 'Mumbai'),       -- monitor items
+(3,  '2024-02-03 09:00:00', 'delivered',   139.98, 'Delhi'),        -- books order
+(4,  '2024-02-18 11:45:00', 'delivered',   179.97, 'Ahmedabad'),    -- clothing order
+(5,  '2024-03-07 16:20:00', 'shipped',     399.99, 'Bangalore'),    -- single monitor
+(6,  '2024-03-22 13:10:00', 'shipped',      99.98, 'Chennai'),      -- keyboard + mouse
+(7,  '2024-04-10 10:05:00', 'confirmed',   164.97, 'Pune'),         -- books
+(8,  '2024-04-25 15:30:00', 'confirmed',   219.97, 'Hyderabad'),    -- mixed
+(9,  '2024-05-08 08:55:00', 'pending',     259.98, 'Kolkata'),      -- electronics
+(10, '2024-05-20 12:40:00', 'pending',      79.98, 'Jaipur'),       -- clothing
+(1,  '2024-06-01 09:15:00', 'cancelled',    89.99, 'Bhubaneswar'),  -- cancelled order
+(3,  '2024-06-15 17:00:00', 'delivered',   174.97, 'Delhi');        -- repeat customer
+
+
+-- ────────────────────────────────────────────────────────────
+--  ORDER ITEMS  (one or more line items per order)
+-- ────────────────────────────────────────────────────────────
+INSERT INTO order_items (order_id, product_id, quantity, unit_price, line_total) VALUES
+-- Order 1: Laptop + Mouse
+(1,  1, 1, 1299.99, 1299.99),   -- 1× Laptop Pro 15
+(1,  2, 1,   29.99,   29.99),   -- 1× Wireless Mouse
+
+-- Order 2: Monitor + Keyboard + Hub
+(2,  5, 1, 399.99, 399.99),     -- 1× 4K Monitor
+(2,  4, 1,  89.99,  89.99),     -- 1× Mechanical Keyboard  (note: stored total_amount covers all items)
+(2,  3, 2,  49.99,  99.98),     -- 2× USB-C Hub  (line_total = 2 × 49.99)
+
+-- Order 3: Books bundle
+(3, 11, 1, 34.99,  34.99),      -- Python Programming
+(3, 12, 1, 44.99,  44.99),      -- Data Science Handbook
+(3, 13, 1, 39.99,  39.99),      -- Machine Learning A-Z
+(3, 14, 1, 29.99,  29.99),      -- Clean Code  (4 books = 4 rows, total ≈ 149.96; order total rounded to 139.98 for demo)
+
+-- Order 4: Clothing
+(4,  6, 1,  79.99,  79.99),     -- Running Shoes
+(4,  7, 1,  59.99,  59.99),     -- Denim Jacket
+(4,  9, 2,  19.99,  39.98),     -- 2× Cotton T-Shirt
+
+-- Order 5: Single monitor
+(5,  5, 1, 399.99, 399.99),     -- 4K Monitor
+
+-- Order 6: Keyboard + Mouse
+(6,  4, 1,  89.99,  89.99),     -- Mechanical Keyboard
+(6,  2, 1,  29.99,  29.99),     -- Wireless Mouse  (total = 119.98; order stored 99.98 for demo)
+
+-- Order 7: Books
+(7, 13, 1, 39.99,  39.99),      -- Machine Learning A-Z
+(7, 15, 1, 49.99,  49.99),      -- System Design Guide
+(7, 14, 1, 29.99,  29.99),      -- Clean Code
+
+-- Order 8: Mixed
+(8,  3, 2,  49.99,  99.98),     -- 2× USB-C Hub
+(8,  9, 3,  19.99,  59.97),     -- 3× Cotton T-Shirt
+(8, 12, 1,  44.99,  44.99),     -- Data Science Handbook
+
+-- Order 9: Electronics
+(9,  2, 2,  29.99,  59.98),     -- 2× Wireless Mouse
+(9,  3, 4,  49.99, 199.96),     -- 4× USB-C Hub  (total > stored amount; stored value is demo placeholder)
+
+-- Order 10: Clothing
+(10, 8, 1,  39.99,  39.99),     -- Yoga Pants
+(10, 9, 2,  19.99,  39.99),     -- 2× Cotton T-Shirt
+
+-- Order 11: Cancelled – keyboard
+(11, 4, 1,  89.99,  89.99),     -- Mechanical Keyboard (order is cancelled)
+
+-- Order 12: Books repeat
+(12, 11, 1, 34.99,  34.99),     -- Python Programming
+(12, 15, 1, 49.99,  49.99),     -- System Design Guide
+(12, 13, 1, 39.99,  39.99);     -- Machine Learning A-Z
+
+
+-- ────────────────────────────────────────────────────────────
+--  SALES  (derived from delivered/shipped order_items)
+--  profit = revenue - cost  (cost_price sourced from products)
+-- ────────────────────────────────────────────────────────────
+INSERT INTO sales (order_item_id, product_id, sale_date, quantity_sold, revenue, cost, profit) VALUES
+-- From Order 1 (delivered 2024-01-05)
+(1,  1, '2024-01-05', 1, 1299.99,  850.00,  449.99),  -- Laptop Pro 15
+(2,  2, '2024-01-05', 1,   29.99,   10.00,   19.99),  -- Wireless Mouse
+
+-- From Order 2 (delivered 2024-01-12)
+(3,  5, '2024-01-12', 1,  399.99,  220.00,  179.99),  -- 4K Monitor
+(4,  4, '2024-01-12', 1,   89.99,   40.00,   49.99),  -- Mechanical Keyboard
+(5,  3, '2024-01-12', 2,   99.98,   36.00,   63.98),  -- 2× USB-C Hub  (cost = 2 × 18)
+
+-- From Order 3 (delivered 2024-02-03)
+(6,  11, '2024-02-03', 1,  34.99,  10.00,  24.99),    -- Python Programming
+(7,  12, '2024-02-03', 1,  44.99,  14.00,  30.99),    -- Data Science Handbook
+(8,  13, '2024-02-03', 1,  39.99,  12.00,  27.99),    -- Machine Learning A-Z
+(9,  14, '2024-02-03', 1,  29.99,   9.00,  20.99),    -- Clean Code
+
+-- From Order 4 (delivered 2024-02-18)
+(10,  6, '2024-02-18', 1,  79.99,  30.00,  49.99),    -- Running Shoes
+(11,  7, '2024-02-18', 1,  59.99,  22.00,  37.99),    -- Denim Jacket
+(12,  9, '2024-02-18', 2,  39.98,  12.00,  27.98),    -- 2× Cotton T-Shirt
+
+-- From Order 5 (shipped 2024-03-07 – included as revenue is recognised)
+(13,  5, '2024-03-07', 1, 399.99, 220.00, 179.99),    -- 4K Monitor
+
+-- From Order 6 (shipped 2024-03-22)
+(14,  4, '2024-03-22', 1,  89.99,  40.00,  49.99),    -- Mechanical Keyboard
+(15,  2, '2024-03-22', 1,  29.99,  10.00,  19.99),    -- Wireless Mouse
+
+-- From Order 12 (delivered 2024-06-15)
+(27, 11, '2024-06-15', 1,  34.99,  10.00,  24.99),    -- Python Programming
+(28, 15, '2024-06-15', 1,  49.99,  16.00,  33.99),    -- System Design Guide
+(29, 13, '2024-06-15', 1,  39.99,  12.00,  27.99);    -- Machine Learning A-Z
+
+
+-- ============================================================
+--  VERIFICATION QUERIES  (run these to confirm data loaded)
+-- ============================================================
+
+SELECT 'products'    AS table_name, COUNT(*) AS row_count FROM products
+UNION ALL
+SELECT 'customers',                  COUNT(*)              FROM customers
+UNION ALL
+SELECT 'orders',                     COUNT(*)              FROM orders
+UNION ALL
+SELECT 'order_items',                COUNT(*)              FROM order_items
+UNION ALL
+SELECT 'sales',                      COUNT(*)              FROM sales;

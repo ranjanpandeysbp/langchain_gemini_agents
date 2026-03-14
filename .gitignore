@@ -1,0 +1,26 @@
+# Ignore Python virtual environment
+venv/
+.venv/
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Environment variables
+.env
+*.env
+
+# VSCode settings (optional)
+.vscode/
+.venv/
+# macOS system files (optional)
+.DS_Store
+
+# Jupyter Notebook checkpoints (optional)
+.ipynb_checkpoints/
+
+# Python egg metadata
+*.egg-info/
+dist/
+build/
