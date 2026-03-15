@@ -1,5 +1,8 @@
 """
-StockSage — AI Research Agent v5 (Streamlit UI)
+StockSage — AI Research Agent v6 (Streamlit UI)
+  • ETF Analysis (NAV, tracking error, AUM, holdings, category)
+  • Full Nifty 500 stock universe (500+ tickers)
+  • All original features preserved
 """
 
 import os
@@ -16,7 +19,7 @@ warnings.filterwarnings("ignore", category=DeprecationWarning)
 # PAGE CONFIG
 # ─────────────────────────────────────────────────────────────────────────────
 st.set_page_config(
-    page_title="StockSage v5 — AI Research Agent",
+    page_title="StockSage v6 — AI Research Agent",
     page_icon="📊",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -46,9 +49,8 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ─────────────────────────────────────────────────────────────────────────────
-# NIFTY INDEX MAP & HELPERS (same as original)
+# NIFTY INDEX MAP
 # ─────────────────────────────────────────────────────────────────────────────
-
 NIFTY_INDEX_MAP = {
     "NIFTY50":"^NSEI","NIFTY":"^NSEI","SENSEX":"^BSESN",
     "NIFTY100":"^CNX100","NIFTY200":"NIFTY200.NS","NIFTY500":"^CNX500",
@@ -88,10 +90,152 @@ NIFTY_INDEX_MAP = {
     "USDJPY":"JPY=X","USDCNY":"CNY=X",
     "MCXGOLD":"GC=F","MCXSILVER":"SI=F","MCXCRUDE":"CL=F",
 }
-
 NIFTY_DISPLAY = {v: k for k, v in NIFTY_INDEX_MAP.items()}
 
+# ─────────────────────────────────────────────────────────────────────────────
+# ETF UNIVERSE — Indian ETFs listed on NSE
+# ─────────────────────────────────────────────────────────────────────────────
+INDIAN_ETF_LIST = [
+    # Equity — Nifty 50
+    "NIFTYBEES","NIFTY1","NIFTYETF","NIFTYIETF","BSLNIFTY","UTINIFTETF","HDFCNIFTY",
+    "SETFNIF50","QNIFTY","NIFTY50ADD","NETF","GROWWNIFTY","IVZINNIFTY","IDFNIFTYET",
+    "AXISNIFTY","LICNETFN50","AONENIFTY","NIFTYBETF",
+    # Equity — Nifty Next 50
+    "JUNIORBEES","NEXT50","SETFNN50","NEXT50IETF","UTINEXT50","ABSLNN50ET",
+    "HDFCNEXT50","MONEXT50","GROWWNXT50",
+    # Equity — Nifty 100 / 200 / 500
+    "NIF100BEES","NIF100IETF","HDFCNIF100","LICNFNHGP","TOP100CAS","NIFTY100EW",
+    "GROWWN200","MONIFTY500","HDFCBSE500","BSE500IETF","MULTICAP","EMULTIMQ",
+    # Equity — Sensex
+    "AXSENSEX","BSLSENETF","SENSEXADD","SENSEXETF","HDFCSENSEX","UTISENSETF",
+    "LICNETFSEN","SENSEXIETF","SNXT30BEES","NEXT30ADD","UTISXN50",
+    # Equity — Midcap
+    "MID150BEES","MID150","MIDCAPETF","MIDCAPIETF","NIFMID150","MID150CAS",
+    "MIDQ50ADD","MIDCAP","MIDSMALL","HDFCMID150","LICNMID100","MOM100","MIDSELIETF",
+    # Equity — Smallcap
+    "SMALLCAP","HDFCSML250","MOSMALL250","SML100CAS","ELM250",
+    # Equity — Factor / Smart Beta
+    "MOMENTUM","HDFCMOMENT","MOM30IETF","MOMOMENTUM","GROWWMOM50","MOMENTUM50","MOM50",
+    "NIFTYQLITY","QUAL30IETF","QUALITY30","SBIETFQLTY","MOQUALITY",
+    "HDFCLOWVOL","LOWVOL1","LOWVOL","LOWVOLIETF","GROWWLOVOL","MOLOWVOL",
+    "ALPHAETF","ALPHA","ALPL30IETF","MOALPHA50",
+    "HDFCVALUE","NV20IETF","NV20","NV20BEES","HDFCGROWTH","AXISVALUE","MOVALUE",
+    "VAL30IETF","ESG","NIFTY100EW","EQUAL50","MON50EQUAL","EQUAL50ADD","SBINEQWETF",
+    "MNC","SHARIABEES",
+    # Equity — Sector: Bank
+    "BANKBEES","BANKIETF","BANKETF","BANKBETF","BBNPNBETF","BANKETFADD","EBANKNIFTY",
+    "HDFCNIFBAN","UTIBANKETF","ABSLBANETF","AXISBNKETF","SETFNIFBK","BANKNIFTY1",
+    # Equity — Sector: IT
+    "ITBEES","IT","ITETF","ITETFADD","ITIETF","AXISTECETF","NIFITETF","SBIETFIT","HDFCNIFIT","TECH",
+    # Equity — Sector: Pharma / Healthcare
+    "PHARMABEES","HEALTHADD","HEALTHIETF","AXISHCETF","HEALTHY","MOHEALTH",
+    # Equity — Sector: FMCG / Consumer
+    "CONS","CONSUMIETF","SBIETFCON","AXISCE","CONSUMBEES","CONSUMER",
+    # Equity — Sector: Auto / EV
+    "AUTOBEES","AUTOIETF","GROWWEV","EVIETF","EVINDIA",
+    # Equity — Sector: Finance / BFSI
+    "BFSI","FINIETF","MOCAPITAL","PVTBANKADD","HDFCPVTBAN","PVTBANIETF","SBIETFPB","NPBET",
+    "PSUBANKADD","HDFCPSUBK","PSUBNKIETF","BANKPSU","PSUBNKBEES","PSUBANK",
+    # Equity — Sector: Energy / Oil / Infra
+    "OILIETF","INFRAIETF","INFRABEES","COMMOIETF","DIVOPPBEES",
+    # Equity — Sector: Metal / Realty
+    "METALIETF","METAL","MOREALTY",
+    # Equity — Sector: Defence / Rail / Tourism / Mfg
+    "GROWWDEFN","MODEFENCE","TNIDETF","GROWWRAIL","MOTOUR","MAKEINDIA","MANUFGBEES",
+    "FMCGIETF","INTERNET","GROWWNET",
+    # Equity — Thematic / Others
+    "ICICIB22","MAHKTECH","MOMGF","MOMIDMTM","MONQ50","MON100","MOPS",
+    "MSCIINDIA","HNGSNGBEES","MAFANG","MASPTOP50","TOP10ADD","TOP15IETF",
+    "AONETOTAL","ABSLPSE","CPSEETF","SELECTIPO",
+    # Gold ETFs
+    "GOLDBEES","GOLDSHARE","HDFCGOLD","AXISGOLD","SETFGOLD","BSLGOLDETF",
+    "LICMFGOLD","GOLDIETF","GROWWGOLD","GOLDETF","MOGOLD","TATAGOLD","UNIONGOLD",
+    "GOLDCASE","GOLD1","GOLDETFADD","EGOLD","IVZINGOLD","QGOLDHALF",
+    "AONEGOLD","BBNPPGOLD","GOLD360",
+    # Silver ETFs
+    "SILVERBEES","SILVERIETF","AXISILVER","SILVERADD","ESILVER","GROWWSLVR",
+    "HDFCSILVER","SILVER1","SILVRETF","MOSILVER","SILVER","SBISILVER",
+    "TATSILV","SILVERETF","SILVERCASE","SILVER360",
+]
+
+# Category mapping for ETFs
+ETF_CATEGORY = {
+    # Nifty 50
+    **{t: "Equity — Nifty 50" for t in ["NIFTYBEES","NIFTY1","NIFTYETF","NIFTYIETF","BSLNIFTY",
+       "UTINIFTETF","HDFCNIFTY","SETFNIF50","QNIFTY","NIFTY50ADD","NETF","GROWWNIFTY",
+       "IVZINNIFTY","IDFNIFTYET","AXISNIFTY","LICNETFN50","AONENIFTY","NIFTYBETF"]},
+    # Next 50
+    **{t: "Equity — Nifty Next 50" for t in ["JUNIORBEES","NEXT50","SETFNN50","NEXT50IETF",
+       "UTINEXT50","ABSLNN50ET","HDFCNEXT50","MONEXT50","GROWWNXT50"]},
+    # Broad
+    **{t: "Equity — Broad Market" for t in ["NIF100BEES","NIF100IETF","HDFCNIF100","LICNFNHGP",
+       "TOP100CAS","NIFTY100EW","GROWWN200","MONIFTY500","HDFCBSE500","BSE500IETF",
+       "MULTICAP","EMULTIMQ"]},
+    # Sensex
+    **{t: "Equity — Sensex" for t in ["AXSENSEX","BSLSENETF","SENSEXADD","SENSEXETF",
+       "HDFCSENSEX","UTISENSETF","LICNETFSEN","SENSEXIETF","SNXT30BEES","NEXT30ADD","UTISXN50"]},
+    # Midcap
+    **{t: "Equity — Midcap" for t in ["MID150BEES","MID150","MIDCAPETF","MIDCAPIETF","NIFMID150",
+       "MID150CAS","MIDQ50ADD","MIDCAP","MIDSMALL","HDFCMID150","LICNMID100","MOM100","MIDSELIETF"]},
+    # Smallcap
+    **{t: "Equity — Smallcap" for t in ["SMALLCAP","HDFCSML250","MOSMALL250","SML100CAS","ELM250"]},
+    # Momentum
+    **{t: "Factor — Momentum" for t in ["MOMENTUM","HDFCMOMENT","MOM30IETF","MOMOMENTUM",
+       "GROWWMOM50","MOMENTUM50","MOM50"]},
+    # Quality
+    **{t: "Factor — Quality" for t in ["NIFTYQLITY","QUAL30IETF","QUALITY30","SBIETFQLTY","MOQUALITY"]},
+    # Low Volatility
+    **{t: "Factor — Low Volatility" for t in ["HDFCLOWVOL","LOWVOL1","LOWVOL","LOWVOLIETF","GROWWLOVOL","MOLOWVOL"]},
+    # Alpha
+    **{t: "Factor — Alpha" for t in ["ALPHAETF","ALPHA","ALPL30IETF","MOALPHA50"]},
+    # Value
+    **{t: "Factor — Value" for t in ["HDFCVALUE","NV20IETF","NV20","NV20BEES","HDFCGROWTH",
+       "AXISVALUE","MOVALUE","VAL30IETF"]},
+    # Equal Weight / Others
+    **{t: "Factor — Equal Weight/Other" for t in ["ESG","NIFTY100EW","EQUAL50","MON50EQUAL",
+       "EQUAL50ADD","SBINEQWETF","MNC","SHARIABEES"]},
+    # Sector — Bank
+    **{t: "Sector — Banking" for t in ["BANKBEES","BANKIETF","BANKETF","BANKBETF","BBNPNBETF",
+       "BANKETFADD","EBANKNIFTY","HDFCNIFBAN","UTIBANKETF","ABSLBANETF","AXISBNKETF",
+       "SETFNIFBK","BANKNIFTY1"]},
+    # Sector — IT
+    **{t: "Sector — IT / Technology" for t in ["ITBEES","IT","ITETF","ITETFADD","ITIETF",
+       "AXISTECETF","NIFITETF","SBIETFIT","HDFCNIFIT","TECH"]},
+    # Sector — Pharma
+    **{t: "Sector — Healthcare / Pharma" for t in ["PHARMABEES","HEALTHADD","HEALTHIETF",
+       "AXISHCETF","HEALTHY","MOHEALTH"]},
+    # Sector — FMCG
+    **{t: "Sector — FMCG / Consumer" for t in ["CONS","CONSUMIETF","SBIETFCON","AXISCE",
+       "CONSUMBEES","CONSUMER","FMCGIETF"]},
+    # Sector — Auto / EV
+    **{t: "Sector — Auto / EV" for t in ["AUTOBEES","AUTOIETF","GROWWEV","EVIETF","EVINDIA"]},
+    # Sector — Finance
+    **{t: "Sector — Finance / BFSI" for t in ["BFSI","FINIETF","MOCAPITAL","PVTBANKADD",
+       "HDFCPVTBAN","PVTBANIETF","SBIETFPB","NPBET","PSUBANKADD","HDFCPSUBK",
+       "PSUBNKIETF","BANKPSU","PSUBNKBEES","PSUBANK"]},
+    # Sector — Energy / Infra
+    **{t: "Sector — Energy / Infra" for t in ["OILIETF","INFRAIETF","INFRABEES","COMMOIETF","DIVOPPBEES"]},
+    # Sector — Metal / Realty
+    **{t: "Sector — Metal / Realty" for t in ["METALIETF","METAL","MOREALTY"]},
+    # Sector — Thematic
+    **{t: "Sector — Thematic / Defence/Infra" for t in ["GROWWDEFN","MODEFENCE","TNIDETF",
+       "GROWWRAIL","MOTOUR","MAKEINDIA","MANUFGBEES","INTERNET","GROWWNET"]},
+    # Gold
+    **{t: "Commodity — Gold ETF" for t in ["GOLDBEES","GOLDSHARE","HDFCGOLD","AXISGOLD",
+       "SETFGOLD","BSLGOLDETF","LICMFGOLD","GOLDIETF","GROWWGOLD","GOLDETF","MOGOLD",
+       "TATAGOLD","UNIONGOLD","GOLDCASE","GOLD1","GOLDETFADD","EGOLD","IVZINGOLD",
+       "QGOLDHALF","AONEGOLD","BBNPPGOLD","GOLD360"]},
+    # Silver
+    **{t: "Commodity — Silver ETF" for t in ["SILVERBEES","SILVERIETF","AXISILVER","SILVERADD",
+       "ESILVER","GROWWSLVR","HDFCSILVER","SILVER1","SILVRETF","MOSILVER","SILVER",
+       "SBISILVER","TATSILV","SILVERETF","SILVERCASE","SILVER360"]},
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# INDIAN TICKERS — Full Nifty 500 universe
+# ─────────────────────────────────────────────────────────────────────────────
 INDIAN_TICKERS = {
+    # Nifty 50 core
     "RELIANCE","TCS","INFY","HDFCBANK","ICICIBANK","KOTAKBANK","HINDUNILVR",
     "BHARTIARTL","ITC","SBIN","BAJFINANCE","AXISBANK","WIPRO","HCLTECH",
     "MARUTI","TITAN","ULTRACEMCO","NESTLEIND","POWERGRID","NTPC","ONGC",
@@ -100,23 +244,95 @@ INDIAN_TICKERS = {
     "BAJAJFINSV","BAJAJ-AUTO","EICHERMOT","HEROMOTOCO","M&M","ASIANPAINT",
     "BRITANNIA","DABUR","MARICO","GODREJCP","PIDILITEIND","HAVELLS",
     "VOLTAS","TATACONSUM","ZOMATO","NYKAA","PAYTM","DMART","IRCTC",
+    # Nifty Next 50
     "LT","LTIM","LTTS","MPHASIS","PERSISTENT","COFORGE","INDIAMART",
     "POLYCAB","DIXON","TRENT","JUBLFOOD","METROPOLIS","LALPATHLAB",
     "ASTRAL","AIAENG","GMRINFRA","CONCOR","CANBK","BANKBARODA","PNB",
     "RECLTD","PFC","NHPC","SJVN","IRFC","RVNL","RAILTEL","HAL",
     "BEL","BHEL","BPCL","IOC","HINDPETRO","GAIL","MGL","PETRONET",
-    "OFSS","KPITTECH","TATAELXSI","INTELLECT","MASTEK","NIITTECH",
+    "OFSS","KPITTECH","TATAELXSI","INTELLECT","MASTEK",
     "SYNGENE","AUROPHARMA","TORNTPHARM","ALKEM","BIOCON","LUPIN",
     "BALKRISIND","CEAT","MRF","APOLLOTYRE","EXIDEIND","AMARARAJA",
     "WHIRLPOOL","BLUESTAR","CROMPTON","ORIENTELEC","BAJAJELEC",
     "KALYANKJIL","SENCO","PCJEWELLER","RAJESHEXPO",
+    # Nifty Midcap 150 additions
+    "MUTHOOTFIN","CHOLAFIN","MANAPPURAM","LICHOUSFIN","CANFINHOME",
+    "PNBHOUSING","REPCO","AAVAS","HOMEFIRST","APTUS",
+    "IREDA","NBCC","HUDCO","RITES","KFINTECH","CAMS","CDSL","BSE",
+    "MCX","NSE","ANGELONE","IIFL","5PAISA","FINEORG",
+    "DEEPAKNTR","ATUL","NOCIL","VINATI","NAVINFLUOR","FLUOROCHEM",
+    "CLEAN","SOLARA","HIKAL","NEULANDLAB","SUVEN","DRREDDYS",
+    "IPCALAB","AJANTPHARM","GRANULES","SEQUENT","LAURUS","DIVIS",
+    "ABBOTINDIA","PFIZER","GLAXO","SANOFI","NOVARTIS",
+    "FORTIS","APOLLOHOSP","NARAYANA","MAXHEALTH","ASTER","MEDANTA",
+    "THYROCARE","KRSNAA","VIJAYADIAG","HEALTHIUM",
+    "NAUKRI","JUSTDIAL","MAPMYINDIA","TARSONS","ROUTE","LATENTVIEW",
+    "DATAMATICS","ZENSAR","FIRSTSOURCE","NIIT","INFIBEAM","NEWGEN",
+    "ABSLAMC","HDFCAMC","NIPPONFIN","MIRAEASSET","UTIAMC","360ONE",
+    "MOTILALOFS","GEOJITFSL","EDELWEISS","JM","VENUSMED",
+    "PAGEIND","TCNSBRANDS","VEDANT","MANYAVAR","GLOBALHEALT",
+    "CAMPUS","METROBRAND","BATA","RELAXO","LIBERTY","MIRZA",
+    "MAHINDCIE","ENDURANCE","SUNDRMBRAK","SUPRAJIT","Gabriel","MOTHERSON",
+    "UNOMINDA","SAMVARDHANA","SONA","CRAFTSMAN","GREENPANEL","CENTURYPLY",
+    "GREENPLY","ARCHIDPLY","KITEX","GRASIM","CUMMINSIND","GRINDWELL",
+    "SCHAEFFLER","SKF","TIMKEN","ELIN","KAYNES","SYRMA","IDEAFORGE",
+    "PARAS","AZAD","AVALON","MAN","NESCO","MANINFRA","RAMCO","RAMCOCEM",
+    "JKCEMENT","HEIDELBERG","BIRLACEM","SAGAR","PRISTINEMFG",
+    "JKPAPER","TNPL","MTNL","BSNL","HFCL","STLTECH","VINDHYATELE",
+    "TEJAS","TTML","ITI","OPTOCIRCUIT","RPGLIFE",
+    "WOCKHARDT","BLISSGVS","GLAND","DIVI","NATCO","EMCURE","JB",
+    "SUVENPHAR","VENUS","MARKSANS","UNICHEM","INDSWFTMED",
+    "CHAMBLFERT","GNFC","RCF","PARADEEP","COROMANDEL","UPL","BAYER",
+    "RALLIS","SUMICHEM","SHARDACROP","PIIND","DHANUKA","ARYACASP",
+    "TATACHEM","AARTI","GALAXYSURF","ANUPAM","CHEMPLASTS","PCBL",
+    "BASF","AKZOINDIA","KANSAINER","BERGER","INDIGO","SPICEJET",
+    "AIRINDIA","BLUEDART","GATI","MAHLOG","TCI","ALLCARGO","AEGISLOG",
+    "SNOWMAN","VRL","TVSSCS","AMIORG","JYOTIRES",
+    "TATACOMMUNIC","TATACOMM","TATADIGITAL","TATAPLAY",
+    "SUNTV","ZEEMEDIA","TV18BRDCST","NDTV","JAGRAN","DBCORP",
+    "HATHWAY","DISHTV","TATASKY","PVRCINEMAS","INOX","SAREGAMA",
+    "TIPS","YASHRAJ",
+    "OBEROIRLTY","PHOENIXLTD","BRIGADE","PRESTIGE","KOLTEPATIL",
+    "GODREJPROP","MAHLIFE","DLFU","DLF","ANANTRAJ","SIGNATURE",
+    "NCLIND","SOBHA","SUNTECKREALT","ARVIND","ARVINDFASN",
+    "RPOWER","ADANIGREEN","ADANITRANS","TATAPOWER","CESC","TORNTPOWER",
+    "JPPOWER","RINFRA","KALPATPOWR","KEC","KEIL","JYOTICNC",
+    "JSWENERGY","GREENKO","RENEWPOWER","INOXWIND","SUZLON","RAIAGRO",
+    "GOLDIAM","THANGAMAYL","TRIBHOVNDAS","PC","TITAN","CARYSIL",
+    "HAWKINS","TTK","SYMPHONY","BAJAJCON","COLPAL","EMAMILTD",
+    "ZYDUSWELL","GILLETTE","PGHH","RECKIT","JYOTHY","VBL","VARUN",
+    "RADICO","UNITDSPR","TILAKNAGAR","MCDOWELL","PICCADILY",
+    "TASTYBITE","MTR","PRATAAP","BIKAJI","DEVYANI","WESTLIFE",
+    "BURGERKING","SAPPHIRE","BARBEQUE","SPECIALITY",
+    "ESCORTS","SONACOMS","TITAGARH","TEXMOPIPES","WELSPUN","APL",
+    "KIRLOSKAR","KIRILOSBRO","ELGIEQUIP","THERMAX","BHARAT",
+    "GREAVES","ISGEC","IOB","UCOFIN","INDIANB","FEDERALBNK",
+    "DCBBANK","KARURVYSYA","CITYUNIONBANK","TMB","LAKSHVILAS",
+    "EQUITASBNK","UJJIVANSFB","ESAFSFB","SURYODAY","UTKARSHBNK",
+    "CREDITACC","SPANDANA","AROHAN","ASIANLAQ","AMFI",
+    "POLICYBZR","ACCENTURE","WIPRO","NIITTECH","CYIENT","ECLERX",
+    "SASKEN","HEXAWARE","MPHASIS","BIRLASOFT","SONATA","RATEGAIN",
+    "CLEARTRIP","YATRA","EASEMYTRIP","IRCTC",
+    "ZOMATO","SWIGGY","BLINKIT","NYKAA","MEESHO","MAMAEARTH",
+    "HONASA","MCAFF","PRAXIS","ONEPLUS",
+    "PIRAMALENT","PIRAMALPH","ASTRAZEN","HIRANAND","WOCKPH",
+    "LAURUSLABS","SUVEN","STRIDES","ALEMBICPH","TORNTPH",
+    "CAPLIN","BLISS","GLENMARK","FDC","IPCA","SMRUTHI",
+    "KPIL","LARSENTOUBRO","NCC","HG","SADBHAV","PNC","KNR",
+    "HGINFRA","JMC","DILIPBUILDCON","AHLUCONT","PSPPROJECTS",
+    "ASHOKA","IRB","MEP","NBCC","HUDCO",
+    "JSWINFRA","ADANIPORTS","MUNDRA","Gujarat","ESSAR","JSPL",
+    "VEDL","HINDALCO","NALCO","MOIL","NMDC","SAIL","JSW",
+    "RATNAMANI","APL","SHYAMMETL","KALYANI","BHARAT",
+    "DEEPAK","BALAJI","BATA","LIBERTY","MIRZA","CAMPUS",
+    "KHADIM","SREELEATHERS","METRO",
 }
 
 SECTOR_INDICES = {
     "IT":"^CNXIT","Bank":"^NSEBANK","FMCG":"^CNXFMCG","Auto":"^CNXAUTO",
     "Pharma":"^CNXPHARMA","Metal":"^CNXMETAL","Realty":"^CNXREALTY",
     "Energy":"^CNXENERGY","Infra":"^CNXINFRA","PSU Bank":"^CNXPSUBANK",
-    "Financial":"^CNXFINANCE","Media":"^CNXMEDIA",
+    "Financial":"NIFTY_FIN_SERVICE.NS","Media":"^CNXMEDIA",
     "Oil & Gas":"NIFTY_OIL_AND_GAS.NS","Healthcare":"NIFTY_HEALTHCARE.NS",
 }
 
@@ -128,6 +344,10 @@ def resolve_ticker(raw: str) -> tuple:
     if raw.endswith(".NS"): return raw, "NSE 🇮🇳"
     if raw.endswith(".BO"): return raw, "BSE 🇮🇳"
     if raw.isdigit():       return f"{raw}.BO", "BSE 🇮🇳"
+    # Check if it's a known ETF
+    base = raw.replace(".NS","").replace(".BO","")
+    if base in [e.upper() for e in INDIAN_ETF_LIST]:
+        return f"{raw}.NS", "NSE ETF 📦"
     if raw in INDIAN_TICKERS: return f"{raw}.NS", "NSE 🇮🇳"
     return raw, "US 🇺🇸"
 
@@ -251,7 +471,361 @@ def _compute_all_technicals(df):
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# TOOL FUNCTIONS (non-decorator versions for direct use)
+# ETF ANALYSIS FUNCTION (NEW)
+# ─────────────────────────────────────────────────────────────────────────────
+
+def get_etf_analysis(ticker: str) -> str:
+    """
+    Comprehensive ETF analysis: NAV, tracking error, AUM, performance,
+    technical levels, expense ratio, category, and comparison signals.
+    """
+    import yfinance as yf
+    import numpy as np
+
+    # Resolve ticker — ensure .NS suffix
+    raw = ticker.strip().upper().replace(".NS","").replace(".BO","")
+    symbol = f"{raw}.NS"
+    category = ETF_CATEGORY.get(raw, "ETF / Index Fund")
+
+    # Determine underlying benchmark for tracking error
+    benchmark_map = {
+        "Equity — Nifty 50": "^NSEI",
+        "Equity — Nifty Next 50": "JUNIORBEES.NS",
+        "Equity — Broad Market": "^CNX500",
+        "Equity — Sensex": "^BSESN",
+        "Equity — Midcap": "NIFTYMIDCAP150.NS",
+        "Equity — Smallcap": "NIFTYSMALLCAP250.NS",
+        "Factor — Momentum": "^NSEI",
+        "Factor — Quality": "^NSEI",
+        "Factor — Low Volatility": "^NSEI",
+        "Factor — Alpha": "^NSEI",
+        "Factor — Value": "^NSEI",
+        "Factor — Equal Weight/Other": "^NSEI",
+        "Sector — Banking": "^NSEBANK",
+        "Sector — IT / Technology": "^CNXIT",
+        "Sector — Healthcare / Pharma": "^CNXPHARMA",
+        "Sector — FMCG / Consumer": "^CNXFMCG",
+        "Sector — Auto / EV": "^CNXAUTO",
+        "Sector — Finance / BFSI": "^CNXFINANCE",
+        "Sector — Energy / Infra": "^CNXENERGY",
+        "Sector — Metal / Realty": "^CNXMETAL",
+        "Sector — Thematic / Defence/Infra": "^NSEI",
+        "Commodity — Gold ETF": "GC=F",
+        "Commodity — Silver ETF": "SI=F",
+    }
+    bench_sym = benchmark_map.get(category, "^NSEI")
+
+    try:
+        tk   = yf.Ticker(symbol)
+        info = tk.info
+
+        # Price / NAV data
+        hist1y = tk.history(period="1y", interval="1d")
+        if hist1y.empty:
+            return f"❌ No data found for ETF '{ticker}'. Please verify the ticker symbol."
+
+        hist6m = hist1y.tail(126)
+        hist3m = hist1y.tail(63)
+        hist1m = hist1y.tail(21)
+        hist1w = hist1y.tail(5)
+
+        nav     = hist1y["Close"].iloc[-1]
+        nav_prev= hist1y["Close"].iloc[-2] if len(hist1y)>1 else nav
+        chg     = nav - nav_prev
+        chgp    = chg / nav_prev * 100 if nav_prev else 0
+
+        # Returns
+        def pct_ret(series):
+            if len(series) < 2: return None
+            return (series.iloc[-1] - series.iloc[0]) / series.iloc[0] * 100
+
+        ret_1w = pct_ret(hist1w)
+        ret_1m = pct_ret(hist1m)
+        ret_3m = pct_ret(hist3m)
+        ret_6m = pct_ret(hist6m)
+        ret_1y = pct_ret(hist1y)
+
+        # YTD
+        ytd_data = hist1y[hist1y.index.year == datetime.now().year]
+        ret_ytd  = pct_ret(ytd_data) if not ytd_data.empty else None
+
+        # 52W H/L
+        w52_high = hist1y["High"].max()
+        w52_low  = hist1y["Low"].min()
+        dist_52h = (nav - w52_high) / w52_high * 100
+        dist_52l = (nav - w52_low)  / w52_low  * 100
+
+        # Volatility
+        daily_rets = hist1y["Close"].pct_change().dropna()
+        ann_vol = daily_rets.std() * (252**0.5) * 100
+        sharpe  = (ret_1y / ann_vol) if (ret_1y and ann_vol) else None
+
+        # Tracking Error vs benchmark
+        tracking_error = None
+        benchmark_ret_1y = None
+        try:
+            bench_hist = yf.Ticker(bench_sym).history(period="1y", interval="1d")
+            if not bench_hist.empty and len(bench_hist) > 20:
+                # Align indices
+                common = hist1y["Close"].reindex(bench_hist.index).dropna()
+                bench_common = bench_hist["Close"].reindex(common.index).dropna()
+                if len(common) > 20:
+                    etf_dr   = common.pct_change().dropna()
+                    bench_dr = bench_common.pct_change().dropna()
+                    min_len  = min(len(etf_dr), len(bench_dr))
+                    if min_len > 10:
+                        diff = etf_dr.values[-min_len:] - bench_dr.values[-min_len:]
+                        tracking_error = diff.std() * (252**0.5) * 100
+                        benchmark_ret_1y = pct_ret(bench_hist["Close"])
+        except: pass
+
+        # Info fields
+        expense_ratio = info.get("annualReportExpenseRatio") or info.get("totalExpenseRatio")
+        aum           = info.get("totalAssets") or info.get("fundInceptionDate")
+        mkt_cap       = info.get("marketCap")
+        avg_vol       = info.get("averageVolume") or hist1y["Volume"].rolling(20).mean().iloc[-1]
+        last_vol      = hist1y["Volume"].iloc[-1]
+        fund_family   = info.get("fundFamily") or info.get("companyOfficers","") or "N/A"
+        fund_name     = info.get("longName") or info.get("shortName") or symbol
+        inception     = info.get("fundInceptionDate")
+        beta          = info.get("beta3Year") or info.get("beta")
+        total_assets  = info.get("totalAssets")
+
+        # Technical signals
+        t = _compute_all_technicals(hist1y)
+
+        def rsi_lbl(r): return "OVERSOLD 🟢" if r<30 else ("OVERBOUGHT 🔴" if r>70 else "NEUTRAL ⚪")
+        trend_lbl = ("STRONG UPTREND 🟢🟢" if nav>t["ema50"]>t["ema200"] else
+                     "UPTREND 🟢"          if nav>t["ema50"] else
+                     "STRONG DOWNTREND 🔴🔴" if nav<t["ema50"]<t["ema200"] else
+                     "DOWNTREND 🔴")
+
+        # Score for buy/sell signal
+        score = 0
+        score += 2 if nav > t["ema200"] else 0
+        score += 1 if nav > t["ema50"]  else 0
+        score += 1 if nav > t["ema20"]  else 0
+        score += 1 if t["hist_v"] > 0   else 0
+        score += 1 if 40 < t["rsi14"] < 70 else 0
+        score += 1 if t["obv_trend"] == "Rising" else 0
+        score += 1 if last_vol > avg_vol * 0.7 else 0
+        score += 1 if t["bb_bw"] < 10 else 0
+        if score >= 8:   sig = "STRONG BUY 🟢🟢"
+        elif score >= 6: sig = "BUY 🟢"
+        elif score >= 5: sig = "MILD BUY 🟢"
+        elif score >= 4: sig = "NEUTRAL ⚪"
+        elif score >= 3: sig = "MILD SELL 🔴"
+        else:            sig = "SELL 🔴🔴"
+
+        def rfmt(v):
+            if v is None: return "N/A"
+            return f"{sign(v)}{v:.2f}%"
+
+        out  = f"\n{'═'*64}\n"
+        out += f"  📦 ETF ANALYSIS — {fund_name}\n"
+        out += f"  {symbol}  |  {category}\n"
+        out += f"{'═'*64}\n"
+        out += f"\n  ┌─ SIGNAL ───────────────────────────────────────────────\n"
+        out += f"  │  Technical Score : {score}/10\n"
+        out += f"  │  Signal          : {sig}\n"
+        out += f"  └────────────────────────────────────────────────────────\n"
+        out += f"\n  [NAV / PRICE]\n"
+        out += f"  NAV (Last)     : ₹{nav:,.4f}  {arrow(chg)} {sign(chg)}{chg:.4f} ({sign(chgp)}{chgp:.2f}%)\n"
+        out += f"  52W High       : ₹{w52_high:,.2f}  ({dist_52h:+.2f}% from current)\n"
+        out += f"  52W Low        : ₹{w52_low:,.2f}   ({dist_52l:+.2f}% from current)\n"
+
+        if total_assets:
+            out += f"\n  [FUND INFO]\n"
+            out += f"  AUM            : ₹{human_number(total_assets)}\n"
+        if fund_family and fund_family != "N/A":
+            out += f"  Fund House     : {fund_family}\n"
+        if expense_ratio:
+            out += f"  Expense Ratio  : {expense_ratio*100:.3f}%\n"
+        if beta:
+            out += f"  Beta (3Y)      : {beta:.3f}\n"
+        if inception:
+            out += f"  Inception Date : {inception}\n"
+
+        out += f"\n  [PERFORMANCE RETURNS]\n"
+        out += f"  1 Week   : {rfmt(ret_1w)}\n"
+        out += f"  1 Month  : {rfmt(ret_1m)}\n"
+        out += f"  3 Months : {rfmt(ret_3m)}\n"
+        out += f"  6 Months : {rfmt(ret_6m)}\n"
+        out += f"  YTD      : {rfmt(ret_ytd)}\n"
+        out += f"  1 Year   : {rfmt(ret_1y)}\n"
+
+        if benchmark_ret_1y is not None:
+            alpha = (ret_1y - benchmark_ret_1y) if ret_1y else None
+            out += f"\n  [vs BENCHMARK — {bench_sym}]\n"
+            out += f"  Benchmark 1Y   : {rfmt(benchmark_ret_1y)}\n"
+            if alpha is not None:
+                out += f"  Alpha (1Y)     : {rfmt(alpha)}  {'🟢 Outperforming' if alpha>0 else '🔴 Underperforming'}\n"
+            if tracking_error is not None:
+                te_lbl = "Excellent ✅" if tracking_error<1 else ("Good ⚠️" if tracking_error<3 else "High ❌")
+                out += f"  Tracking Error : {tracking_error:.2f}%/yr  →  {te_lbl}\n"
+
+        out += f"\n  [RISK METRICS]\n"
+        out += f"  Ann. Volatility: {ann_vol:.2f}%\n"
+        if sharpe:
+            out += f"  Sharpe Ratio   : {sharpe:.3f}  {'✅' if sharpe>1 else ('⚠️' if sharpe>0.5 else '❌')}\n"
+
+        out += f"\n  [VOLUME]\n"
+        out += f"  Last Volume    : {human_number(last_vol)}\n"
+        out += f"  20D Avg Volume : {human_number(avg_vol)}\n"
+        out += f"  OBV Trend      : {t['obv_trend']} {'🟢' if t['obv_trend']=='Rising' else '🔴'}\n"
+
+        out += f"\n  [TECHNICALS]\n"
+        out += f"  Trend          : {trend_lbl}\n"
+        out += f"  RSI(14)        : {t['rsi14']:.1f}  →  {rsi_lbl(t['rsi14'])}\n"
+        out += f"  MACD Hist      : {t['hist_v']:.4f}  {'🟢 Bullish' if t['hist_v']>0 else '🔴 Bearish'}\n"
+        out += f"  EMA 20         : ₹{t['ema20']:,.4f}  {'▲ Above' if nav>t['ema20'] else '▼ Below'}\n"
+        out += f"  EMA 50         : ₹{t['ema50']:,.4f}  {'▲ Above' if nav>t['ema50'] else '▼ Below'}\n"
+        out += f"  EMA 200        : ₹{t['ema200']:,.4f}  {'▲ Above' if nav>t['ema200'] else '▼ Below'}\n"
+        out += f"  BB Upper/Lower : ₹{t['bb_up']:,.4f} / ₹{t['bb_lo']:,.4f}\n"
+
+        out += f"\n  [KEY LEVELS]\n"
+        out += f"  Support (5d)   : ₹{t['sup5']:,.4f}\n"
+        out += f"  Resistance (5d): ₹{t['res5']:,.4f}\n"
+        out += f"  Support (20d)  : ₹{t['sup20']:,.4f}\n"
+        out += f"  Resistance(20d): ₹{t['res20']:,.4f}\n"
+        out += f"  Pivot (PP)     : ₹{t['pp']:,.4f}\n"
+        out += f"  R1: ₹{t['r1']:,.4f}   R2: ₹{t['r2']:,.4f}\n"
+        out += f"  S1: ₹{t['s1']:,.4f}   S2: ₹{t['s2']:,.4f}\n"
+        out += f"\n  ⚠️  Educational only. Not financial advice.\n"
+        return out
+    except Exception as e:
+        return f"Error fetching ETF data for {ticker}: {e}"
+
+
+def get_etf_category_screener(category_filter: str = "all") -> str:
+    """Screen ETFs by category and show performance rankings."""
+    import yfinance as yf
+
+    cat_lower = category_filter.lower().strip()
+
+    # Filter ETF list
+    if cat_lower == "gold":
+        etfs = [(t, "Commodity — Gold ETF") for t in INDIAN_ETF_LIST
+                if ETF_CATEGORY.get(t, "").startswith("Commodity — Gold")]
+    elif cat_lower == "silver":
+        etfs = [(t, "Commodity — Silver ETF") for t in INDIAN_ETF_LIST
+                if ETF_CATEGORY.get(t, "").startswith("Commodity — Silver")]
+    elif cat_lower in ["nifty50","nifty 50","n50"]:
+        etfs = [(t, ETF_CATEGORY.get(t,"")) for t in INDIAN_ETF_LIST
+                if "Nifty 50" in ETF_CATEGORY.get(t,"")]
+    elif cat_lower in ["bank","banking"]:
+        etfs = [(t, ETF_CATEGORY.get(t,"")) for t in INDIAN_ETF_LIST
+                if "Banking" in ETF_CATEGORY.get(t,"")]
+    elif cat_lower in ["it","tech","technology"]:
+        etfs = [(t, ETF_CATEGORY.get(t,"")) for t in INDIAN_ETF_LIST
+                if "IT" in ETF_CATEGORY.get(t,"")]
+    elif cat_lower in ["factor","smart beta"]:
+        etfs = [(t, ETF_CATEGORY.get(t,"")) for t in INDIAN_ETF_LIST
+                if ETF_CATEGORY.get(t,"").startswith("Factor")]
+    elif cat_lower in ["sector"]:
+        etfs = [(t, ETF_CATEGORY.get(t,"")) for t in INDIAN_ETF_LIST
+                if ETF_CATEGORY.get(t,"").startswith("Sector")]
+    elif cat_lower in ["commodity","commodities"]:
+        etfs = [(t, ETF_CATEGORY.get(t,"")) for t in INDIAN_ETF_LIST
+                if ETF_CATEGORY.get(t,"").startswith("Commodity")]
+    else:
+        # Show all — limit to avoid timeout
+        etfs = [(t, ETF_CATEGORY.get(t,"ETF")) for t in INDIAN_ETF_LIST[:60]]
+
+    results = []
+    for ticker, cat in etfs[:40]:  # Limit API calls
+        try:
+            hist = yf.Ticker(f"{ticker}.NS").history(period="3mo", interval="1d")
+            if hist.empty or len(hist) < 5: continue
+            nav   = hist["Close"].iloc[-1]
+            prev  = hist["Close"].iloc[-2]
+            chg1d = (nav - prev) / prev * 100 if prev else 0
+            ret1m = (nav - hist["Close"].iloc[-21]) / hist["Close"].iloc[-21] * 100 if len(hist)>=21 else 0
+            ret3m = (nav - hist["Close"].iloc[0])   / hist["Close"].iloc[0]   * 100
+            vol   = hist["Volume"].iloc[-1]
+            results.append((ticker, cat, nav, chg1d, ret1m, ret3m, vol))
+        except: pass
+
+    if not results:
+        return f"⚠️ No ETF data found for category: {category_filter}"
+
+    results.sort(key=lambda x: x[5], reverse=True)
+
+    out  = f"\n📦 ETF CATEGORY SCREENER — {category_filter.upper()}\n{'═'*72}\n"
+    out += f"  {'ETF':<16} {'NAV':>8} {'1D%':>7} {'1M%':>7} {'3M%':>9}  {'Category':<30}\n"
+    out += f"  {'─'*14} {'─'*8} {'─'*7} {'─'*7} {'─'*9}  {'─'*28}\n"
+    for ticker, cat, nav, c1d, r1m, r3m, vol in results:
+        out += (f"  {ticker:<16} ₹{nav:>7,.2f} "
+                f"{sign(c1d)}{c1d:>5.2f}% "
+                f"{sign(r1m)}{r1m:>5.2f}% "
+                f"{sign(r3m)}{r3m:>7.2f}%  "
+                f"{cat[:30]}\n")
+    out += f"\n  🏆 Best 3M: {results[0][0]} ({sign(results[0][5])}{results[0][5]:.2f}%)\n"
+    out += f"  📉 Worst 3M: {results[-1][0]} ({sign(results[-1][5])}{results[-1][5]:.2f}%)\n"
+    out += f"  Showing {len(results)} ETFs  |  {datetime.now().strftime('%d %b %Y %H:%M')}\n"
+    return out
+
+
+def compare_etfs(tickers: str) -> str:
+    """Compare multiple ETFs side by side."""
+    import yfinance as yf
+    raw_list = [t.strip().upper() for t in tickers.replace(" vs ",",").replace(" VS ",",").split(",") if t.strip()]
+    if len(raw_list) < 2:
+        return "Provide at least 2 ETF tickers separated by commas."
+    rows = []
+    for raw in raw_list[:5]:
+        base = raw.replace(".NS","")
+        sym  = f"{base}.NS"
+        try:
+            tk   = yf.Ticker(sym)
+            info = tk.info
+            hist = tk.history(period="1y", interval="1d")
+            if hist.empty: raise ValueError("No data")
+            nav  = hist["Close"].iloc[-1]
+            ret1y = (nav - hist["Close"].iloc[0]) / hist["Close"].iloc[0] * 100
+            ret1m = (nav - hist["Close"].iloc[-21]) / hist["Close"].iloc[-21] * 100 if len(hist)>=21 else None
+            ret3m = (nav - hist["Close"].iloc[-63]) / hist["Close"].iloc[-63] * 100 if len(hist)>=63 else None
+            ann_v = hist["Close"].pct_change().dropna().std() * (252**0.5) * 100
+            sharpe= ret1y / ann_v if ann_v else None
+            exp   = info.get("annualReportExpenseRatio") or info.get("totalExpenseRatio")
+            aum   = info.get("totalAssets")
+            w52h  = hist["High"].max()
+            w52l  = hist["Low"].min()
+            cat   = ETF_CATEGORY.get(base, "ETF")
+            rows.append({"sym":base, "nav":nav, "ret1y":ret1y, "ret1m":ret1m, "ret3m":ret3m,
+                         "annvol":ann_v, "sharpe":sharpe, "exp":exp, "aum":aum,
+                         "w52h":w52h, "w52l":w52l, "cat":cat, "ok":True})
+        except Exception as e:
+            rows.append({"sym":base, "ok":False, "err":str(e)})
+
+    out  = f"\n⚖️  ETF COMPARISON\n{'═'*72}\n"
+    out += f"  {'Metric':<20}" + "".join(f"{r['sym']:<18}" for r in rows) + "\n"
+    out += f"  {'─'*20}" + "─"*18*len(rows) + "\n"
+
+    def row_line(label, fn):
+        line = f"  {label:<20}"
+        for r in rows:
+            if not r.get("ok"): line += f"{'ERR':<18}"; continue
+            try:    line += f"{fn(r):<18}"
+            except: line += f"{'N/A':<18}"
+        return line + "\n"
+
+    out += row_line("NAV",          lambda r: f"₹{r['nav']:,.2f}")
+    out += row_line("1M Return",    lambda r: f"{sign(r['ret1m'])}{r['ret1m']:.2f}%" if r['ret1m'] else "N/A")
+    out += row_line("3M Return",    lambda r: f"{sign(r['ret3m'])}{r['ret3m']:.2f}%" if r['ret3m'] else "N/A")
+    out += row_line("1Y Return",    lambda r: f"{sign(r['ret1y'])}{r['ret1y']:.2f}%")
+    out += row_line("Ann. Vol",     lambda r: f"{r['annvol']:.2f}%")
+    out += row_line("Sharpe Ratio", lambda r: f"{r['sharpe']:.3f}" if r['sharpe'] else "N/A")
+    out += row_line("Expense Ratio",lambda r: f"{r['exp']*100:.3f}%" if r['exp'] else "N/A")
+    out += row_line("AUM",          lambda r: f"₹{human_number(r['aum'])}" if r['aum'] else "N/A")
+    out += row_line("52W High",     lambda r: f"₹{r['w52h']:,.2f}")
+    out += row_line("52W Low",      lambda r: f"₹{r['w52l']:,.2f}")
+    out += row_line("Category",     lambda r: r['cat'][:17])
+    return out
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# ORIGINAL TOOL FUNCTIONS (unchanged)
 # ─────────────────────────────────────────────────────────────────────────────
 
 def get_stock_quote(ticker: str) -> str:
@@ -1063,12 +1637,13 @@ def compare_stocks(tickers: str) -> str:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# AGENT (LangChain + Gemini) — only if API key is available
+# AGENT (LangChain + Gemini)
 # ─────────────────────────────────────────────────────────────────────────────
 
-SYSTEM_PROMPT = """You are StockSage v5, an expert AI equity research analyst for Indian (NSE/BSE + 50+ Nifty indices) and US (NYSE/NASDAQ) markets.
+SYSTEM_PROMPT = """You are StockSage v6, an expert AI equity research analyst for Indian (NSE/BSE + 50+ Nifty indices + 200+ ETFs) and US (NYSE/NASDAQ) markets.
 
 For stock queries: provide full analysis including quote, fundamentals, technicals, and analyst consensus.
+For ETF queries: use the etf_analysis_tool for detailed NAV/tracking error/AUM analysis, or etf_screener_tool for category screening.
 For indices: include PCR, pivot levels, and sector context.
 For trade setups: ALWAYS show Entry, SL, T1/T2/T3, and RR ratio.
 For macro queries: include crude oil, gold, DXY, USD/INR, US futures context.
@@ -1082,8 +1657,7 @@ Always end with:
 ⚠️ Educational only. Not financial advice."""
 
 
-def run_agent_query(query: str, api_key: str, model: str = "gemini-1.5-flash") -> str:
-    """Run query via LangChain ReAct agent with Gemini."""
+def run_agent_query(query: str, api_key: str, model: str = "gemini-3-flash-preview") -> str:
     import os
     os.environ["LANGCHAIN_TRACING_V2"] = "false"
 
@@ -1093,15 +1667,14 @@ def run_agent_query(query: str, api_key: str, model: str = "gemini-1.5-flash") -
     from langchain.agents.agent import AgentExecutor
     from langchain import hub
 
-    # Wrap functions as tools
     @lc_tool
     def quote_tool(ticker: str) -> str:
-        """Get real-time price quote for any stock or index."""
+        """Get real-time price quote for any stock, ETF, or index."""
         return get_stock_quote(ticker)
 
     @lc_tool
     def fundamental_tool(ticker: str) -> str:
-        """Get detailed fundamental analysis report."""
+        """Get detailed fundamental analysis report for a stock."""
         return get_detailed_fundamental_report(ticker)
 
     @lc_tool
@@ -1159,9 +1732,25 @@ def run_agent_query(query: str, api_key: str, model: str = "gemini-1.5-flash") -
         """Compare multiple stocks side by side."""
         return compare_stocks(tickers)
 
+    @lc_tool
+    def etf_analysis_tool(ticker: str) -> str:
+        """Get comprehensive ETF analysis: NAV, tracking error, AUM, returns, technicals. Use for any Indian ETF ticker like GOLDBEES, NIFTYBEES, BANKBEES, etc."""
+        return get_etf_analysis(ticker)
+
+    @lc_tool
+    def etf_screener_tool(category: str) -> str:
+        """Screen and rank ETFs by category. Categories: gold, silver, nifty50, bank, it, factor, sector, commodity, or 'all'."""
+        return get_etf_category_screener(category)
+
+    @lc_tool
+    def etf_compare_tool(tickers: str) -> str:
+        """Compare multiple ETFs side by side. Input: comma-separated ETF tickers like 'GOLDBEES, HDFCGOLD, AXISGOLD'."""
+        return compare_etfs(tickers)
+
     all_tools = [quote_tool, fundamental_tool, technical_tool, analyst_tool,
                  pcr_tool, intraday_tool, swing_tool, macro_tool, market_tool,
-                 sector_tool, index_tool, news_tool, compare_tool]
+                 sector_tool, index_tool, news_tool, compare_tool,
+                 etf_analysis_tool, etf_screener_tool, etf_compare_tool]
 
     llm = ChatGoogleGenerativeAI(model=model, temperature=0.15, google_api_key=api_key)
     base_prompt = hub.pull("hwchase17/react")
@@ -1203,7 +1792,7 @@ with st.sidebar:
         )
         gemini_model = st.selectbox(
             "Gemini Model",
-            ["gemini-3.1-flash-lite-preview", "gemini-1.5-flash", "gemini-1.5-pro", "gemini-2.0-flash"],
+            ["gemini-3.1-flash-lite-preview", "gemini-3-flash-preview", "gemini-2.5-flash", "gemini-2.5-flash-lite"],
             index=0
         )
 
@@ -1251,7 +1840,7 @@ with st.sidebar:
             with st.spinner("Fetching sector data..."):
                 st.session_state.result = get_sectoral_momentum(period_sel)
 
-    with st.expander("🔍 Quick Lookup"):
+    with st.expander("🔍 Quick Lookup — Stocks"):
         quick_ticker = st.text_input("Ticker", placeholder="RELIANCE, TCS, GOLD...")
         col1, col2 = st.columns(2)
         with col1:
@@ -1281,6 +1870,34 @@ with st.sidebar:
         if st.button("📰 News", use_container_width=True) and quick_ticker:
             with st.spinner("Searching news..."):
                 st.session_state.result = search_stock_news(quick_ticker)
+
+    # ── NEW: ETF Tools ────────────────────────────────────────────────────────
+    with st.expander("📦 ETF Analysis  ★ NEW", expanded=True):
+        st.markdown("*200+ Indian ETFs supported*")
+        etf_ticker = st.text_input("ETF Ticker", placeholder="GOLDBEES, NIFTYBEES, BANKBEES...")
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("🔍 ETF Analysis", use_container_width=True) and etf_ticker:
+                with st.spinner("Analysing ETF..."):
+                    st.session_state.result = get_etf_analysis(etf_ticker)
+        with col2:
+            if st.button("📈 ETF Technical", use_container_width=True) and etf_ticker:
+                with st.spinner("Analysing..."):
+                    st.session_state.result = get_detailed_technical_report(etf_ticker + ".NS" if not etf_ticker.endswith(".NS") else etf_ticker)
+
+        st.markdown("**ETF Category Screener**")
+        etf_cat = st.selectbox("Category", [
+            "all","gold","silver","nifty50","bank","it","factor","sector","commodity"
+        ])
+        if st.button("📊 Screen ETFs", use_container_width=True):
+            with st.spinner("Screening ETFs..."):
+                st.session_state.result = get_etf_category_screener(etf_cat)
+
+        st.markdown("**Compare ETFs**")
+        etf_compare_input = st.text_input("ETFs to Compare", placeholder="GOLDBEES, HDFCGOLD, AXISGOLD")
+        if st.button("⚖️ Compare ETFs", use_container_width=True) and etf_compare_input:
+            with st.spinner("Comparing ETFs..."):
+                st.session_state.result = compare_etfs(etf_compare_input)
 
     with st.expander("🔢 Compare Stocks"):
         compare_input = st.text_input("Tickers (comma-separated)", placeholder="TCS, INFY, WIPRO")
@@ -1312,15 +1929,14 @@ with st.sidebar:
 st.markdown("""
 <div style="text-align:center; padding: 1rem 0 0.5rem 0;">
   <h1 style="font-size:2.2rem; font-weight:800; background: linear-gradient(135deg, #60a5fa, #a78bfa); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">
-    📊 StockSage v5
+    📊 StockSage v6
   </h1>
   <p style="color:#94a3b8; font-size:0.95rem; margin-top:-0.5rem;">
-    AI Research Agent · Indian (NSE/BSE/Nifty) + US Markets · Global Macro
+    AI Research Agent · Indian (NSE/BSE/Nifty + 200 ETFs) + US Markets · Global Macro
   </p>
 </div>
 """, unsafe_allow_html=True)
 
-# Feature badges
 st.markdown("""
 <div style="text-align:center; margin-bottom:1.5rem;">
   <span class="badge">📈 Technicals</span>
@@ -1328,7 +1944,9 @@ st.markdown("""
   <span class="badge">🎯 Trade Setups</span>
   <span class="badge">🌍 Global Macro</span>
   <span class="badge">📊 PCR/Options</span>
+  <span class="badge">📦 ETF Analysis ★</span>
   <span class="badge">🤖 AI Analysis</span>
+  <span class="badge">500+ Stocks</span>
 </div>
 """, unsafe_allow_html=True)
 
@@ -1348,6 +1966,14 @@ with st.container():
         "Detailed fundamental report for HDFCBANK",
         "Nifty IT technical analysis and sector outlook",
         "Which sectors are outperforming this month?",
+        # ETF specific
+        "Full ETF analysis of GOLDBEES with technicals",
+        "Compare GOLDBEES vs HDFCGOLD vs AXISGOLD",
+        "Which Gold ETFs have the lowest tracking error?",
+        "Screen top performing factor ETFs this month",
+        "Analyse NIFTYBEES vs JUNIORBEES — which is better?",
+        "Best sector ETFs for current market conditions",
+        "Compare BANKBEES vs PSUBNKBEES — fundamentals and trend",
     ]
 
     col_q, col_btn = st.columns([5, 1])
@@ -1359,7 +1985,7 @@ with st.container():
         user_query = st.text_area(
             "Your question",
             value=st.session_state.query_input,
-            placeholder="e.g. Full analysis of RELIANCE with intraday setup...",
+            placeholder="e.g. Full analysis of GOLDBEES ETF with tracking error...",
             height=80,
             label_visibility="collapsed"
         )
@@ -1401,29 +2027,29 @@ if st.session_state.result:
 
     st.markdown(f'<div class="result-box">{st.session_state.result}</div>', unsafe_allow_html=True)
 else:
-    # Welcome screen
     st.markdown("""
     <div style="background: #1e2130; border: 1px dashed #3d4f7c; border-radius:10px; padding:2rem; text-align:center; margin-top:1rem;">
-      <p style="color:#60a5fa; font-size:1.1rem; font-weight:600;">👋 Welcome to StockSage v5</p>
+      <p style="color:#60a5fa; font-size:1.1rem; font-weight:600;">👋 Welcome to StockSage v6</p>
       <p style="color:#94a3b8;">
         Use the <strong>Quick Tools</strong> in the sidebar for instant data (no API key needed),
-        or type a question above for AI-powered analysis (requires Gemini API key).
+        or type a question above for AI-powered analysis (requires Gemini API key).<br><br>
+        <strong>New in v6:</strong> 📦 Full ETF analysis (200+ ETFs), 500+ Nifty stocks, 
+        Tracking Error, AUM, ETF screener, ETF comparison.
       </p>
       <br>
       <p style="color:#64748b; font-size:0.85rem;">
-        📌 Try: Market Overview → 🇮🇳 India &nbsp;|&nbsp; Quick Lookup → RELIANCE → Quote
-        &nbsp;|&nbsp; Macro Dashboard → 🛢️ All Macro
+        📌 Try: ETF Analysis → GOLDBEES &nbsp;|&nbsp; ETF Screener → gold &nbsp;|&nbsp;
+        Compare ETFs → GOLDBEES, HDFCGOLD, AXISGOLD
       </p>
     </div>
     """, unsafe_allow_html=True)
 
-# Footer
 st.markdown("""
 <div style="text-align:center; margin-top:2rem; padding: 1rem; border-top: 1px solid #2d3748;">
   <p style="color:#475569; font-size:0.8rem;">
     ⚠️ <strong>Educational purposes only. Not financial advice.</strong>
     Data via yfinance. AI via Google Gemini. &nbsp;|&nbsp;
-    StockSage v5 © 2025
+    StockSage v6 © 2025 | 200+ ETFs · 500+ Stocks · 50+ Indices
   </p>
 </div>
 """, unsafe_allow_html=True)

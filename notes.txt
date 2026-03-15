@@ -152,3 +152,5 @@ Managing the {tools}, {tool_names}, {agent_scratchpad} placeholders yourself —
 
 In short: it's the instruction manual that teaches the LLM how to be an agent — without it, 
 the LLM would just respond like a chatbot with no awareness of the tools available to it.
+
+streamlit run .\eleven_sa_fa_ta_trade_streamlit.py
