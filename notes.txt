@@ -1,3 +1,48 @@
+Youtube Playlist: https://www.youtube.com/playlist?list=PLTDZOZDZd6cWlFF_0Hx6_C1jVx2pC40JX
+
+What are Parameters in Large Language Models (LLMs)
+---------------------------------------------
+LLM parameters refer to the internal weights and values that a large language model (LLM) 
+learns during training. These parameters often numbering in billions are used to capture patterns 
+in language such as grammar, meaning, context and relationships between words. 
+The more parameters a model has, the more capacity it typically has to understand and generate 
+better and complex output making them a core factor in the model’s performance and complexity.
+
+Parameters in Large Language Models (LLMs)
+
+1. Temperature
+Temperature controls the randomness or creativity in the output generation.
+A high temperature makes the model more diverse and creative while a low temperature produces more focused 
+and deterministic responses.
+This parameter is specially important for tasks requiring creative generation like poetry or story writing.
+
+2. Max Tokens
+This parameter limits the maximum number of tokens the model can generate in response.
+It's an important parameter for controlling the length of the generated output ensuring that 
+it stays within a defined range whether for more comprehensive content.
+
+3. Top-p (Nucleus Sampling)
+Top-p helps control the diversity of text by focusing on the top p probability mass when selecting the next token.
+For example, with a top-p value of 0.9 the model will select from the most probable tokens that make up 90% 
+of the total probability distribution ensuring output is both coherent and varied.
+
+4. Presence Penalty
+Presence penalty discourages the model from repeating the same words or concepts in the generated text.
+This parameter helps to avoid repetitive output and promotes diversity in the language specially useful 
+for longer text generations like articles or dialogues.
+
+5. Frequency Penalty
+Frequency penalty reduces the likelihood of the model repeatedly using common words.
+By applying this penalty the model is encouraged to avoid generating repetitive phrases 
+ensuring the text remains fresh and engaging.
+
+6. Top-k
+Top-k restricts the model’s choice to the k most likely tokens for the next word. 
+For example, with top-k = 50, the model only considers the 50 most probable tokens at each step, 
+ignoring all others. Here Low k means output is more predictable and focused 
+and High k means output is more varied but still coherent.
+
+-------------------------
 What is LangChain?
 
 LangChain is a framework that helps developers build applications powered by Large Language Models (LLMs).
@@ -94,11 +139,16 @@ Action Input: 6, 7
 Observation: 42
 Thought:   I now know the final answer
 Final Answer: 42
-The LLM is instructed to loop through Thought → Action → Observation until it has enough information to give a Final Answer. LangChain's AgentExecutor parses each step, calls the appropriate tool when it sees an Action, feeds the result back as Observation, and keeps looping.
+
+The LLM is instructed to loop through Thought → Action → Observation until it has enough information to give a Final Answer. 
+LangChain's AgentExecutor parses each step, calls the appropriate tool when it sees an Action, 
+feeds the result back as Observation, and keeps looping.
+
 Why pull it instead of writing it yourself?
 You could write this prompt manually, but hub.pull saves you from:
 
 Getting the exact format tokens wrong (LangChain's parser is strict about keywords like Action Input:)
 Managing the {tools}, {tool_names}, {agent_scratchpad} placeholders yourself — the template handles all of these automatically
 
-In short: it's the instruction manual that teaches the LLM how to be an agent — without it, the LLM would just respond like a chatbot with no awareness of the tools available to it.
+In short: it's the instruction manual that teaches the LLM how to be an agent — without it, 
+the LLM would just respond like a chatbot with no awareness of the tools available to it.

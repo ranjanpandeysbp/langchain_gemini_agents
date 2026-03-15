@@ -2,22 +2,6 @@
 MySQL Agent using Gemini
 Connects to a MySQL database and answers natural-language questions interactively.
 Type 'exit' or 'quit' to stop the session.
-
-Fixed for:
-  langchain==0.2.16
-  langchain-community==0.2.16
-  langchain-core==0.2.38
-  langchain-google-genai==1.0.10
-  langchainhub==0.1.1        ← too old for hub.pull(); replaced with inline prompt
-  python-dotenv==0.21.0
-  mysql-connector-python
-
-Fixes applied:
-  1. hub.pull() replaced with inline PromptTemplate (langchainhub 0.1.1 incompatible)
-  2. convert_system_message_to_human removed; system text folded into prompt instead
-  3. safety_settings added to suppress FinishReason=19 (recitation block) crash
-  4. get_database_schema accepts input: str = "" for ReAct tool compatibility
-  5. max_iterations + max_execution_time guard against runaway agent loops
 """
 
 # ── Imports ────────────────────────────────────────────────────────────────────
@@ -119,18 +103,6 @@ def get_database_schema(input: str = "") -> str:
 
 
 # ── LLM ───────────────────────────────────────────────────────────────────────
-# FIX 1: convert_system_message_to_human removed – it now triggers a
-#         deprecation warning in 1.0.10 and will be removed entirely.
-#         The system instruction is folded into the ReAct prompt below instead.
-#
-# FIX 2: safety_settings set to BLOCK_NONE for all harm categories.
-#         Gemini 1.5 returns FinishReason=19 (RECITATION) when it thinks it is
-#         reproducing licensed text – database query results (product names,
-#         prices, dates) frequently trip this filter.  The old proto enum in
-#         langchain-google-genai==1.0.10 does not know about value 19, so it
-#         crashes with: 'int' object has no attribute 'name'.
-#         Setting BLOCK_NONE stops the safety block before it reaches the
-#         broken enum parser.
 llm = ChatGoogleGenerativeAI(
     model=model,
     temperature=0,
@@ -145,9 +117,6 @@ llm = ChatGoogleGenerativeAI(
 
 
 # ── ReAct prompt (inline) ──────────────────────────────────────────────────────
-# FIX: langchainhub==0.1.1 is incompatible with langchain 0.2.x.
-#      The standard ReAct template is embedded directly here.
-#      A brief system context line replaces convert_system_message_to_human.
 REACT_TEMPLATE = """You are a helpful data analyst assistant. Answer questions about the MySQL database using the tools provided.
 
 You have access to the following tools:

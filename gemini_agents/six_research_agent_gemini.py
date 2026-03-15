@@ -90,7 +90,7 @@ def research_topic(topic: str) -> str:
             research += f"- {result.get('title', 'N/A')}: {result.get('body', 'N/A')}\n"  # Add result to report
         
         # Search for latest developments on topic
-        development_results = ddgs.text(f"{topic} latest 2024 2025", max_results=3)  # Recent developments search
+        development_results = ddgs.text(f"{topic} latest 2025 2026", max_results=3)  # Recent developments search
         research += f"\nLatest Developments:\n"  # Section header
         for result in development_results:
             research += f"- {result.get('title', 'N/A')}: {result.get('body', 'N/A')}\n"  # Add development to report
@@ -154,5 +154,5 @@ print(test_result)
 
 # Uncomment to run a test:
 print("\nRunning example query...\n")
-result = executor.invoke({"input": "What are the latest developments in AI?"})
+result = executor.invoke({"input": "What are the latest developments in Iran Israel US war?"})
 print(result["output"])
